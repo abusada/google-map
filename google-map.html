@@ -385,6 +385,7 @@ If you're seeing the message "You have included the Google Maps API multiple tim
        */
       markers: {
         type: Array,
+        notify: true,
         value: function() { return []; },
         readOnly: true
       },
@@ -424,9 +425,11 @@ If you're seeing the message "You have included the Google Maps API multiple tim
     },
 
     detached: function() {
-      if (this._markersChildrenListener) {
-        this.unlisten(this.$.selector, 'items-changed', '_updateMarkers');
-        this._markersChildrenListener = null;
+      if (this._markersObserverNodes) {
+        // this.unlisten(this.$.selector, 'items-changed', '_updateMarkers');
+        // https://github.com/GoogleWebComponents/google-map/pull/265/files
+        Polymer.dom(this.$.selector).unobserveNodes(this._markersObserverNodes);
+        this._markersObserverNodes = null;
       }
       if (this._objectsMutationObserver) {
         this._objectsMutationObserver.disconnect();
@@ -495,16 +498,20 @@ If you're seeing the message "You have included the Google Maps API multiple tim
     // watch for future updates to marker objects
     _observeMarkers: function() {
       // Watch for future updates.
-      if (this._markersChildrenListener) {
+      if (this._markersObserverNodes) {
         return;
       }
-      this._markersChildrenListener = this.listen(this.$.selector, 'items-changed', '_updateMarkers');
+
+      // https://github.com/GoogleWebComponents/google-map/pull/265/files
+      this._markersObserverNodes = Polymer.dom(this.$.selector).observeNodes(this._updateMarkers.bind(this));
+      // this._markersObserverNodes = this.listen(this.$.selector, 'items-changed', '_updateMarkers');
     },
 
     _updateMarkers: function() {
+
       var newMarkers = Array.prototype.slice.call(
           Polymer.dom(this.$.markers).getDistributedNodes());
-    console.log('_updateMarkers');
+
       // do not recompute if markers have not been added or removed
       if (newMarkers.length === this.markers.length) {
         var added = newMarkers.filter(function(m) {
@@ -512,7 +519,7 @@ If you're seeing the message "You have included the Google Maps API multiple tim
         }.bind(this));
         if (added.length === 0) {
           // set up observer first time around
-          if (!this._markersChildrenListener) {
+          if (!this._markersObserverNodes) {
             this._observeMarkers();
           }
           return;
@@ -544,7 +551,6 @@ If you're seeing the message "You have included the Google Maps API multiple tim
     _updateObjects: function() {
       var newObjects = Array.prototype.slice.call(
           Polymer.dom(this.$.objects).getDistributedNodes());
-  console.log('_updateObjects');
       // Do not recompute if objects have not been added or removed.
       if (newObjects.length === this.objects.length) {
         var added = newObjects.filter(function(o) {
